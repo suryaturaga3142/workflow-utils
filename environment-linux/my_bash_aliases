@@ -1,0 +1,65 @@
+# ~/.bash_aliases
+
+# --- Escapes for Color ---
+# Reset
+NC='\033[0m'
+# Regular Colors (Use often)
+BLACK='\033[0;30m'
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[0;33m'
+BLUE='\033[0;34m'
+PURPLE='\033[0;35m'
+CYAN='\033[0;36m'
+WHITE='\033[0;37m'
+# Bold Colors (Brighter/Emphasized)
+B_BLACK='\033[1;30m'
+B_RED='\033[1;31m'
+B_GREEN='\033[1;32m'
+B_YELLOW='\033[1;33m'
+B_BLUE='\033[1;34m'
+B_PURPLE='\033[1;35m'
+B_CYAN='\033[1;36m'
+B_WHITE='\033[1;37m'
+# Background Colors (Use sparingly)
+BG_RED='\033[41m'
+BG_GREEN='\033[42m'
+BG_BLUE='\033[44m'
+
+# --- Better Control ---
+
+# Navigation Aliases
+alias ..='cd ..'
+alias ...='cd ../..'
+alias ....='cd ../../..'
+# alias -='cd -'
+
+# Quality of Life
+alias ll='ls -alF --color=auto'  # List all, long format, colored
+alias la='ls -A --color=auto'    # List all (hide . and ..)
+alias l='ls -CF --color=auto'
+alias c='clear'
+alias grep='grep --color=auto'
+
+# Safety nets (ask before deleting/overwriting)
+# alias rm='rm -i'
+# alias cp='cp -i'
+# alias mv='mv -i'
+
+# --- Developer Tools & Vim Mode ---
+alias g++='g++ -Wall -Wextra -std=c++17'
+alias gcc='gcc -Wall -Wextra'
+alias py='python3'
+alias code.='code .'
+
+# --- Git Shortcuts ---
+alias gs='git status'
+alias ga='git add'
+alias gaa='git add .'
+alias gc='git commit -m'
+alias gp='git pull'
+alias gh='git push'
+alias gl='git log --oneline --graph --decorate --all' # The "Subway Map" view
+
+# --- Custom Functions ---
+# Located in ~/.bash_functions

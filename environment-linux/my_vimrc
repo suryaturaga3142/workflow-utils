@@ -1,0 +1,78 @@
+" ~/.vimrc
+
+" --- General Settings ---
+set nocompatible            " Disable vi-compatibility (Must be first)
+set encoding=utf8           " Force UTF-8 encoding
+filetype plugin indent on   " Enable detection of file types
+syntax on                   " Enable syntax highlighting
+
+" --- UI & Visuals ---
+set number                  " Show line numbers on the left
+set ruler                   " Show cursor position (row, col) at bottom
+set cursorline              " Highlight the current line (helps find cursor)
+set showcmd                 " Show incomplete commands in status bar
+set scrolloff=5             " Keep 5 lines of context above/below cursor when scrolling
+set laststatus=2            " Always show the status line
+set wildmenu                " Enhanced command-line completion (Tab key menu)
+
+" --- Search Behavior ---
+set incsearch               " Highlight matches as you type
+set hlsearch                " Keep matches highlighted after searching
+set ignorecase              " Ignore case when searching...
+set smartcase               " ...unless you type a capital letter
+
+" --- Colors ---
+set t_Co=256                " Force 256 colors for Git Bash/Putty
+if (has("termguicolors"))
+    set termguicolors       " Enable True Color support if available
+endif
+
+set background=dark         " Tell vim we are using a dark background
+try 
+    colorscheme gruvbox
+catch
+    colorscheme elflord     " Backup if Gruvbox isn't installed
+endtry
+
+" --- Indentation & Formatting ---
+" Default: 4 spaces, keep indentation from previous line
+set tabstop=4               " Visual width of a tab
+set shiftwidth=4            " Indentation width
+set softtabstop=4           " Edit as if tabs are spaces
+set expandtab               " Convert tabs to spaces (Safer default)
+set autoindent              " Copy indent from current line when starting new one
+
+" tmux style
+set splitbelow
+set splitright
+
+" Python: Strict 4 spaces
+autocmd FileType python setlocal expandtab tabstop=4 shiftwidth=4
+
+" C / SystemVerilog: 4 spaces (Tabs vs Spaces preference safe here)
+autocmd FileType c,cpp,verilog,systemverilog setlocal tabstop=4 shiftwidth=4 shiftround
+
+" Force .sv files to be detected as SystemVerilog
+autocmd BufRead,BufNewFile *.sv set filetype=systemverilog
+
+" --- Safety & Backups (The 'Hidden Drawer' Method) ---
+" Prevents backup files (file.c~) from cluttering actual project folders
+let &backupdir=($HOME . '/.vim_backup_files')
+if ! isdirectory(&backupdir)
+    call mkdir(&backupdir, "", 0700)
+endif
+set backup
+set writebackup
+
+" --- Useful Key Mappings ---
+" Set the 'Leader' key to Space (Easier to hit than \)
+let mapleader = " "
+
+" Press 'Space + Space' to clear search highlighting 
+nnoremap <Leader><Leader> :noh<CR>
+
+" tmux style
+nnoremap <C-h> <C-w>h
+nnoremap <C-j> <C-w>j
+nnoremap <C-k> <C-w>k
+nnoremap <C-l> <C-w>l

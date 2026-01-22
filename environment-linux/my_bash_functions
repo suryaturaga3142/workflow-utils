@@ -1,0 +1,201 @@
+#!/bin/bash
+# ~/.bash_functions
+
+if [ -f ~/.bash_aliases ]; then
+    . ~/.bash_aliases
+fi
+
+# Make Directory and Change into it
+mkcd() {
+    mkdir -p "$1"
+    cd "$1" || exit 1
+}
+
+# Switch to win
+cdwin() {
+    cd "$WIN" || exit 1
+}
+
+# Universal Extractor
+extract() {
+    if [ -f "$1" ] ; then
+        echo -e "Extracting ${YELLOW}$1${NC}..."
+        case "$1" in
+            *.tar.bz2)   tar xjf "$1"    ;;
+            *.tar.gz)    tar xzf "$1"    ;;
+            *.bz2)       bunzip2 "$1"    ;;
+            *.rar)       unrar e "$1"    ;;
+            *.gz)        gunzip "$1"     ;;
+            *.tar)       tar xf "$1"     ;;
+            *.tbz2)      tar xjf "$1"    ;;
+            *.tgz)       tar xzf "$1"    ;;
+            *.zip)       unzip "$1"      ;;
+            *.Z)         uncompress "$1" ;;
+            *.7z)        7z x "$1"       ;;
+            *)           
+                echo -e "${RED}Error:${NC} '${YELLOW}$1${NC}' cannot be extracted via extract()" 
+                return 1
+                ;;
+        esac
+        if [ $? -eq 0 ]; then
+            echo -e "${GREEN}Success!${NC}"
+        fi
+    else
+        echo -e "${RED}Error:${NC} '${YELLOW}$1${NC}' is not a valid file"
+        return 1
+    fi
+}
+
+# --- Extra Additions ---
+
+# Vim cheat sheet
+vimcheat() {
+    echo -e "\n${B_PURPLE}=== VIM CHEAT SHEET ===${NC}"
+
+    echo -e "\n${B_BLUE}--- SPLITS (View multiple files) ---${NC}"
+    echo -e "${B_CYAN}:vsp filename${NC}   Vertical Split (Left/Right)"
+    echo -e "${B_CYAN}:sp filename${NC}    Horizontal Split (Top/Bottom)"
+    echo -e "${B_CYAN}Ctrl + h/j/k/l${NC}  Navigate splits (Left/Down/Up/Right)"
+    echo -e "${B_CYAN}:q${NC}              Close current split"
+
+    echo -e "\n${B_BLUE}--- TABS (Separate Workspaces) ---${NC}"
+    echo -e "${B_CYAN}:tabnew file${NC}    Open file in a brand new tab"
+    echo -e "${B_CYAN}gt${NC}              Go to Next Tab"
+    echo -e "${B_CYAN}gT${NC}              Go to Previous Tab"
+
+    echo -e "\n${B_BLUE}--- SEARCHING ---${NC}"
+    echo -e "${B_CYAN}/word${NC}           Search forward"
+    echo -e "${B_CYAN}?word${NC}           Search backward"
+    echo -e "${B_CYAN}n / N${NC}           Next match / Previous match"
+    echo -e "${B_CYAN}Space Space${NC}     Clear search highlights (Custom Shortcut)"
+    echo ""
+}
+
+# tmux cheat sheet
+tmuxcheat() {
+    echo -e "\n${B_PURPLE}=== TMUX CHEAT SHEET ===${NC}"
+
+    echo -e "\n${B_BLUE}--- PREFIX ---${NC}"
+    echo -e "${B_CYAN}Ctrl + a${NC}         tmux prefix (leader key)"
+    echo -e "${B_CYAN}Ctrl + a Ctrl + a${NC} Send literal Ctrl+a"
+
+    echo -e "\n${B_BLUE}--- WORKSPACES (WINDOWS) ---${NC}"
+    echo -e "${B_CYAN}Ctrl + a c${NC}       Create new window (same directory)"
+    echo -e "${B_CYAN}Ctrl + a n${NC}       Next window"
+    echo -e "${B_CYAN}Ctrl + a p${NC}       Previous window"
+    echo -e "${B_CYAN}Ctrl + a 1–9${NC}     Jump to window number (i3-style)"
+
+    echo -e "\n${B_BLUE}--- PANES (SPLITS) ---${NC}"
+    echo -e "${B_CYAN}Ctrl + a |${NC}       Vertical split (left / right)"
+    echo -e "${B_CYAN}Ctrl + a -${NC}       Horizontal split (top / bottom)"
+    echo -e "${B_CYAN}Ctrl + a f${NC}       Toggle pane fullscreen (zoom)"
+    echo -e "${B_CYAN}Ctrl + a x${NC}       Kill current pane"
+
+    echo -e "\n${B_BLUE}--- PANE NAVIGATION ---${NC}"
+    echo -e "${B_CYAN}h / j / k / l${NC}    Move focus between panes"
+    echo -e "${B_CYAN}Ctrl + h / l${NC}     Move between windows (left / right)"
+
+    echo -e "\n${B_BLUE}--- PANE RESIZE ---${NC}"
+    echo -e "${B_CYAN}H / J / K / L${NC}    Resize pane (coarse)"
+    echo -e "${B_CYAN}< / >${NC}            Resize pane (fine)"
+
+    echo -e "\n${B_BLUE}--- COPY MODE ---${NC}"
+    echo -e "${B_CYAN}Ctrl + a [${NC}       Enter copy mode"
+    echo -e "${B_CYAN}h / j / k / l${NC}    Move cursor"
+    echo -e "${B_CYAN}/${NC}              Search forward"
+    echo -e "${B_CYAN}?${NC}              Search backward"
+    echo -e "${B_CYAN}v${NC}               Begin selection"
+    echo -e "${B_CYAN}y${NC}               Yank selection to clipboard"
+    echo -e "${B_CYAN}Esc${NC}             Exit copy mode"
+
+    echo -e "\n${B_BLUE}--- SESSION MANAGEMENT ---${NC}"
+    echo -e "${B_CYAN}tmux new -s name${NC} Create named session"
+    echo -e "${B_CYAN}tmux ls${NC}          List sessions"
+    echo -e "${B_CYAN}tmux attach -t name${NC} Attach to session"
+    echo -e "${B_CYAN}Ctrl + a d${NC}       Detach from session"
+
+    echo -e "\n${B_BLUE}--- CONFIG ---${NC}"
+    echo -e "${B_CYAN}Ctrl + a r${NC}       Reload tmux config"
+
+    echo ""
+}
+
+
+# TODO tree cheat sheet
+todocheat () {
+    echo -e "\n${B_PURPLE}=== TODO TREE CHEAT SHEET ===${NC}"
+
+    echo -e "\n${B_BLUE}--- LEVEL 1: URGENT / BROKEN ---${NC}"
+    echo -e "${B_CYAN}BUG${NC}         Broken functionality, crashes, or known errors."
+    echo -e "${B_CYAN}CRITICAL${NC}    Severe issues causing data loss or system failure."
+
+    echo -e "\n${B_BLUE}--- LEVEL 2: NEEDS ATTENTION ---${NC}"
+    echo -e "${B_CYAN}FIXME${NC}       Code runs but logic is flawed or incomplete."
+    echo -e "${B_CYAN}OPTIMIZE${NC}    Performance bottleneck; needs speed/efficiency update."
+
+    echo -e "\n${B_BLUE}--- LEVEL 3: STANDARD / INFO ---${NC}"
+    echo -e "${B_CYAN}TODO${NC}        Standard task or feature to be implemented."
+    echo -e "${B_CYAN}HACK${NC}        Working but messy solution; technical debt."
+    echo -e "${B_CYAN}NOTE${NC}        General information or clarification."
+    echo -e "${B_CYAN}REVIEW${NC}      Code requires a peer review or double-check."
+    echo -e "${B_CYAN}XXX${NC}         Warning, placeholder, or scary code."
+    echo ""
+}
+
+# Login ssh
+sshgit() {
+    eval "$(ssh-agent)" 1>/dev/null
+    ssh-add "/path/to/ssh"
+}
+
+# Activate condas
+# Sourced script.
+cm () {
+    local script_path="/path/to/conda_manager.sh"
+    if [ -f "$script_path" ]; then
+        . "$script_path" "$@"
+    else
+        echo -e "${RED}Error:${NC} Venv Manager not found at ${YELLOW}$script_path${NC}"
+        return 1
+    fi
+}
+
+# Add todo tree settings
+newtodo() {
+    local template="/path/to/todo_basic.json"
+    local target_dir=".vscode"
+    local target_file="$target_dir/settings.json"
+
+    if [ ! -f "$template" ]; then
+        echo -e "${RED}Error: Template not found at ${YELLOW}$template${NC}"
+        return 1
+    fi
+
+    if [ ! -d "$target_dir" ]; then
+        echo -e "${CYAN}Creating directory ${YELLOW}$target_dir${NC}..."
+        mkdir -p "$target_dir"
+    fi
+
+    if [ ! -f "$target_file" ]; then
+        echo -e "${CYAN}Creating new ${YELLOW}$target_file${NC} from template..."
+        cp "$template" "$target_file"
+        echo -e "${GREEN}Success! Todo Tree settings installed.${NC}"
+    else
+        echo -e "${CYAN}Found existing ${YELLOW}$target_file${NC}. Injecting settings..."
+        # Create backup
+        cp "$target_file" "${target_file}.bak"
+        echo -e "${CYAN}Backup created at ${YELLOW}${target_file}.bak${NC}"
+        
+        # 1. Remove the last line (the closing '}') of the target file
+        sed -i '$d' "$target_file"
+        # 2. Add a comma to the new last line (to ensure valid JSON syntax)
+        #    Note: This assumes the file ends with a property/value.
+        sed -i '$s/$/,/' "$target_file"
+        # 3. Strip the first line ('{') and last line ('}') from template and append
+        sed '1d;$d' "$template" >> "$target_file"
+        # 4. Close the main object
+        echo -e "\n}" >> "$target_file"
+
+        echo -e "${GREEN}Success! Todo Tree settings injected into ${YELLOW}$target_file${NC}."
+    fi
+}

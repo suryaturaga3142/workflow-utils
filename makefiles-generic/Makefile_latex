@@ -1,0 +1,119 @@
+# Makefile for handling LaTeX projects
+
+include ~/design/colors.mk
+
+# --- Standard Template ---
+define TEX_TEMPLATE
+\\documentclass[12pt]{article}
+\\usepackage[margin=1in]{geometry}
+\\usepackage{amsmath, amssymb} % Standard Math packages
+\\usepackage{graphicx}
+\\usepackage{enumitem}
+\\usepackage{fontspec}
+%
+\\usepackage[default]{sourceserifpro}
+\\usepackage[scale=0.95]{FiraSans}
+\\newcommand{\\FiraSans}{\\sffamily}
+%
+\\title{$*}
+\\author{Surya Pratheek Turaga}
+\\date{\\today}
+%
+\\begin{document}
+\\maketitle
+%
+\\section{Heading 1}
+% Start typing here...
+%
+\\end{document}
+endef
+export TEX_TEMPLATE
+
+# --- Configuration ---
+LATEXMK      = latexmk
+LATEXMK_OPTS = -interaction=nonstopmode -file-line-error -xelatex
+
+# --- Export Configuration ---
+EXPORT_TARGET       ?= /path/to/export
+EXPORTABLE_PROJECTS := ok options
+
+# Find all projects based on folder structure
+TEXFILES := $(wildcard */*.tex)
+PROJECTS := $(basename $(notdir $(TEXFILES)))
+
+# --- Targets ---
+.PHONY: all help clean $(PROJECTS) watch-% clean-%
+
+# Default target
+all: $(PROJECTS)
+
+# Help Command
+help:
+	@echo "$(B_PURPLE)LaTeX Project Manager$(NC)"
+	@echo "Usage: make $(CYAN)[target]$(NC)"
+	@echo ""
+	@echo "Targets:"
+	@echo "  $(YELLOW)all$(NC)             Build all detected projects."
+	@echo "  $(YELLOW)<project>$(NC)       Build a specific project (e.g., 'make resume')."
+	@echo "  $(YELLOW)watch-<project>$(NC) Continuous compilation (preview mode) for a project."
+	@echo "  $(YELLOW)clean$(NC)           Remove build artifacts for ALL projects."
+	@echo "  $(YELLOW)clean-<project>$(NC) Remove build artifacts for a SPECIFIC project."
+	@echo "  $(YELLOW)new-<name>$(NC)      Create a new project folder and .tex template."
+	@echo "  $(YELLOW)export-<name>$(NC)   Build and export specific PDF (e.g., resume) to EXPORT_TARGET."
+	@echo "  $(YELLOW)help$(NC)            Show this help message."
+	@echo ""
+	@echo "Detected Projects: $(CYAN)$(PROJECTS)$(NC)"
+
+# Build Rule
+$(PROJECTS):
+	@echo "Building $(B_WHITE)$@$(NC)..."
+	@mkdir -p $@/build
+	$(LATEXMK) $(LATEXMK_OPTS) -outdir=$@/build $@/$@.tex
+	@cp $@/build/$@.pdf $@/
+	@echo "Finished $(GREEN)$@$(NC)."
+
+# Watch Rule (Continuous Preview)
+watch-%:
+	@echo "Watching $(B_CYAN)$*$(NC)..."
+	@mkdir -p $*/build
+	$(LATEXMK) $(LATEXMK_OPTS) -outdir=$*/build -pvc $*/$*.tex
+
+# Clean Specific Project
+clean-%:
+	@echo "Cleaning $(RED)$*$(NC)..."
+	@rm -rf $*/build $*/$*.pdf
+	@echo "Cleaned $(RED)$*$(NC)."
+
+# Clean All
+clean:
+	@echo "Cleaning $(B_RED)all projects$(NC)..."
+	@for d in $(PROJECTS); do \
+		echo "  Removing build files for $$d"; \
+		rm -rf $$d/build $$d/$$d.pdf; \
+	done
+	@echo "$(GREEN)Done.$(NC)"
+
+# Create New Project
+new-%:
+	@if [ -d "$*" ]; then \
+		echo "$(RED)Error: Directory '$*' already exists.$(NC)"; \
+		exit 1; \
+	fi
+	@echo "Initializing new project: $(B_CYAN)$*$(NC)..."
+	@mkdir -p $*
+	@echo "$$TEX_TEMPLATE" > $*/$*.tex
+	@echo "$(GREEN)Success!$(NC) Created $(YELLOW)$*/$*.tex$(NC)"
+
+# Export specific projects
+export-%: %
+	@if ! echo "$(EXPORTABLE_PROJECTS)" | grep -F -w -q "$*"; then \
+		echo "$(RED)Error:$(NC) Project '$(YELLOW)$*$(NC)' is not configured for export."; \
+		echo "Allowed projects: $(YELLOW)$(EXPORTABLE_PROJECTS)$(NC)"; \
+		exit 1; \
+	fi
+	@# 2. Preparation: Ensure export directory exists
+	@mkdir -p $(EXPORT_TARGET)
+	@echo "Exporting $(B_CYAN)$*$(NC)..."
+	@# 3. Execution: Copy and Rename
+	@cp $*/$*.pdf "$(EXPORT_TARGET)/$*_SuryaTuraga.pdf"
+	@echo "$(GREEN)Success!$(NC) Saved to $(YELLOW)$(EXPORT_TARGET)/$*_SuryaTuraga.pdf$(NC)"
