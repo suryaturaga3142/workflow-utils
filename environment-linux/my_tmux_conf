@@ -1,0 +1,99 @@
+##### PREFIX & CORE #####
+
+unbind C-b
+set -g prefix C-a
+bind C-a send-prefix
+
+set -g mouse off
+set -g focus-events on
+
+set -g base-index 1
+setw -g pane-base-index 1
+set -g renumber-windows on
+
+set -g history-limit 50000
+set -s escape-time 0
+set -g repeat-time 300
+
+set -g default-terminal "tmux-256color"
+
+##### SESSION SAFETY (EDA/SSH FRIENDLY) #####
+
+set -g detach-on-destroy off
+set -g allow-rename off
+set -g assume-paste-time 1
+set -g set-clipboard on
+
+##### WINDOW / WORKSPACE BEHAVIOR #####
+
+bind c new-window -c "#{pane_current_path}"
+bind n next-window
+bind p previous-window
+
+# i3-like numbered workspace switching
+bind 1 select-window -t 1
+bind 2 select-window -t 2
+bind 3 select-window -t 3
+bind 4 select-window -t 4
+bind 5 select-window -t 5
+bind 6 select-window -t 6
+bind 7 select-window -t 7
+bind 8 select-window -t 8
+bind 9 select-window -t 9
+
+##### SPLITS (i3 STYLE) #####
+
+bind | split-window -h -c "#{pane_current_path}" \; select-layout even-horizontal
+bind - split-window -v -c "#{pane_current_path}" \; select-layout even-vertical
+unbind '"'
+unbind %
+
+##### PANE NAVIGATION (VIM / i3 STYLE) #####
+
+bind h select-pane -L
+bind j select-pane -D
+bind k select-pane -U
+bind l select-pane -R
+
+##### RESIZE MODE (LIKE i3 resize) #####
+
+bind -r H resize-pane -L 5
+bind -r J resize-pane -D 5
+bind -r K resize-pane -U 5
+bind -r L resize-pane -R 5
+
+bind -r < resize-pane -L 1
+bind -r > resize-pane -R 1
+
+##### FULLSCREEN (i3-style toggle) #####
+
+bind f resize-pane -Z
+
+##### COPY MODE (PURE VIM) #####
+
+setw -g mode-keys vi
+
+bind-key -T copy-mode-vi h send -X cursor-left
+bind-key -T copy-mode-vi j send -X cursor-down
+bind-key -T copy-mode-vi k send -X cursor-up
+bind-key -T copy-mode-vi l send -X cursor-right
+
+bind-key -T copy-mode-vi v send -X begin-selection
+bind-key -T copy-mode-vi y send -X copy-selection-and-cancel
+bind-key -T copy-mode-vi Escape send -X cancel
+
+bind / copy-mode \; send -X search-forward
+bind ? copy-mode \; send -X search-backward
+
+##### STATUS BAR (GRUVBOX-ALIGNED) #####
+
+set -g status-style bg=colour235,fg=colour223
+set -g status-left "#[fg=colour142,bold][#S]#[default] "
+set -g status-right "#[fg=colour214]#h #[fg=colour109]%H:%M %d-%b #{?window_zoomed_flag,#[fg=colour167]ZOOM,}#[default]"
+
+setw -g window-status-style fg=colour245,bg=colour235
+setw -g window-status-current-style fg=colour235,bg=colour214,bold
+
+##### CONFIG RELOAD #####
+
+bind r source-file ~/.tmux.conf \; display-message "tmux.conf reloaded"
