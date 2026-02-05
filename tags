@@ -1,0 +1,33 @@
+!_TAG_FILE_FORMAT	2	/extended format; --format=1 will not append ;" to lines/
+!_TAG_FILE_SORTED	1	/0=unsorted, 1=sorted, 2=foldcase/
+!_TAG_OUTPUT_EXCMD	mixed	/number, pattern, mixed, or combineV2/
+!_TAG_OUTPUT_FILESEP	slash	/slash or backslash/
+!_TAG_OUTPUT_MODE	u-ctags	/u-ctags or e-ctags/
+!_TAG_PATTERN_LENGTH_LIMIT	96	/0 for no limit/
+!_TAG_PROC_CWD	/home/surya/stuff/workflow-utils/	//
+!_TAG_PROGRAM_AUTHOR	Universal Ctags Team	//
+!_TAG_PROGRAM_NAME	Universal Ctags	/Derived from Exuberant Ctags/
+!_TAG_PROGRAM_URL	https://ctags.io/	/official site/
+!_TAG_PROGRAM_VERSION	5.9.0	//
+EOF	headless-virtuoso/gen_cell.sh	/^cat > "$SKILL_SCRIPT" <<EOF$/;"	h
+EOF	headless-virtuoso/gen_project.sh	/^cat > "$SKILL_SCRIPT" <<EOF$/;"	h
+EOF	headless-virtuoso/place_parts.sh	/^cat > "$SKILL_SCRIPT" <<'EOF'$/;"	h
+EOF	scripts-generic/my_setup.sh	/^cat << 'EOF' > \/path\/to\/todo_basic.json$/;"	h
+EOF	scripts-generic/my_setup.sh	/^cat << 'EOF' > ~\/.vimrc$/;"	h
+EOF	scripts-generic/my_setup.sh	/^cat << 'EOF' >> ~\/.bash_aliases$/;"	h
+EOF	scripts-generic/my_setup.sh	/^cat << 'EOF' >> ~\/.bashrc$/;"	h
+EOF	scripts-generic/my_setup.sh	/^cat << EOF >> ~\/.bash_functions$/;"	h
+cputs	headless-vivado/colors.tcl	/^proc cputs {color msg} {$/;"	p
+die	headless-virtuoso/config.sh	/^die() {$/;"	f
+get_cm_list	scripts-generic/conda_manager.sh	/^function get_cm_list {$/;"	f
+get_venv_list	scripts-generic/venv_manager.sh	/^function get_venv_list {$/;"	f
+info	headless-virtuoso/config.sh	/^info() {$/;"	f
+ok	headless-virtuoso/config.sh	/^ok() {$/;"	f
+print_error	headless-vivado/colors.tcl	/^proc print_error {msg} {$/;"	p
+print_header	headless-vivado/colors.tcl	/^proc print_header {title} {$/;"	p
+print_help	headless-vivado/rebuild_project.tcl	/^proc print_help {} {$/;"	p
+print_success	headless-vivado/colors.tcl	/^proc print_success {msg} {$/;"	p
+show_cm_usage	scripts-generic/conda_manager.sh	/^function show_cm_usage {$/;"	f
+show_usage	scripts-generic/venv_manager.sh	/^function show_usage {$/;"	f
+warn	headless-virtuoso/config.sh	/^warn() {$/;"	f
+workflow-utils	README.md	/^# workflow-utils$/;"	c
