@@ -1,0 +1,209 @@
+#!/bin/tcsh
+
+# Argument parsing
+set DO_SYNTH = 0
+set DO_FPGA = 0
+set FILTER   = ""
+
+foreach arg ( $argv )
+    if ( "$arg" == "-t" ) then
+        set DO_SYNTH = 1
+    else if ( "$arg" == "-f" ) then
+        set DO_FPGA = 1
+    else
+        set FILTER = "$arg"
+    endif
+end
+
+if ( "$FILTER" != "" ) then
+    set ASM_GLOB = "asmFiles/${FILTER}*"
+else
+    set ASM_GLOB = "asmFiles/*.asm"
+endif
+
+# Configuration
+set EVENT_LOG  = run.events.txt
+set STATUS_LOG = status.txt
+set DIFF_LOG   = diffs.txt
+set RPT_DIR    = my-rpts
+set MEM_HEX    = memcpu.hex
+
+if ( $DO_FPGA ) then
+    set DO_SYNTH = 0
+    set RPT_DIR = my-fpga-rpts
+    set MEM_HEX = memfpga.hex
+endif
+
+set START_TS = `date +%s`
+
+# Init
+
+if ( $DO_FPGA ) then
+    set HOST = `hostname`
+    if ( "$HOST" !~ "potr176*" ) then
+        echo "ERROR: FPGA Flow only allowed on potr176lnx<NN>.ecn.purdue.edu machines."
+        echo "Current host: $HOST"
+
+        echo -n "" >! $EVENT_LOG
+        echo "EVT_VERSION=1" >> $EVENT_LOG
+        set ts0 = `date +%s`
+        echo "TS=$START_TS EVT=RUN_END ASM=NONE STAGE=HOST STATUS=FAIL DUR_S=0" >> $EVENT_LOG
+
+        exit 1
+    endif
+endif
+
+make clean >& /dev/null
+if ( $DO_SYNTH || $DO_FPGA ) then
+    mkdir -p $RPT_DIR
+    rm -rf $RPT_DIR/* >& /dev/null
+endif
+
+echo -n "" >! $STATUS_LOG
+echo -n "" >! $DIFF_LOG
+echo -n "" >! $EVENT_LOG
+
+set ts0 = `date +%s`
+echo "EVT_VERSION=1" >> $EVENT_LOG
+echo "TS=$START_TS EVT=RUN_START ASM=ALL STAGE=RUN STATUS=START" >> $EVENT_LOG
+
+set fail_count = 0
+set asm_count  = 0
+
+# Main loop
+foreach file ( $ASM_GLOB )
+
+    if ( ! -e "$file" ) continue
+
+    make clean >& /dev/null
+    sleep 1
+
+    @ asm_count++
+    set filename = `basename "$file"`
+
+    echo "================================" >> $STATUS_LOG
+    echo "$filename" >> $STATUS_LOG
+    echo "================================" >> $STATUS_LOG
+
+    # ASM simulation
+    set ts0 = `date +%s`
+    echo "TS=$ts0 EVT=STAGE_START ASM=$filename STAGE=ASM STATUS=START" >> $EVENT_LOG
+    echo "> Simulating assembly file $file ..." >> $STATUS_LOG
+
+    asm "$file"
+    sim >& /dev/null
+
+    set ts1 = `date +%s`
+    @ dur = $ts1 - $ts0
+    echo "TS=$ts1 EVT=STAGE_END ASM=$filename STAGE=ASM STATUS=OK DUR_S=$dur" >> $EVENT_LOG
+
+    # Synthesis
+    if ( $DO_SYNTH ) then
+        set ts0 = `date +%s`
+        echo "TS=$ts0 EVT=STAGE_START ASM=$filename STAGE=SYNTH STATUS=START" >> $EVENT_LOG
+        echo "> Synthesizing design for $filename ..." >> $STATUS_LOG
+
+        make system.syntp >&! $RPT_DIR/rpt_${filename}.txt
+        sleep 1
+
+        set ts1 = `date +%s`
+        @ dur = $ts1 - $ts0
+        echo "TS=$ts1 EVT=STAGE_END ASM=$filename STAGE=SYNTH STATUS=OK DUR_S=$dur RPT=$RPT_DIR/rpt_${filename}.log" >> $EVENT_LOG
+    endif
+
+    # FPGA Testing
+    if ( $DO_FPGA ) then
+        set ts0 = `date +%s`
+        echo "TS=$ts0 EVT=STAGE_START ASM=$filename STAGE=FPGA STATUS=START" >> $EVENT_LOG
+        echo "> Testing FPGA Implementation for $filename ..." >> $STATUS_LOG
+
+        timeout 600 synthesize_xilinx -m -d -p -t -f 100 system_fpga >&! $RPT_DIR/rpt_fpga_${filename}.txt
+        if ( $status != 0 ) then
+            echo "> FPGA Implementation Timeout/Failure." >> $STATUS_LOG
+            set ts1 = `date +%s`
+            @ dur = $ts1 - $ts0
+            echo "TS=$ts1 EVT=STAGE_END ASM=$filename STAGE=FPGA STATUS=FAIL DUR_S=$dur RPT=$RPT_DIR/rpt_fpga_${filename}.log" >> $EVENT_LOG
+            @ fail_count++
+            continue
+        else
+            set ts1 = `date +%s`
+            @ dur = $ts1 - $ts0
+            echo "TS=$ts1 EVT=STAGE_END ASM=$filename STAGE=FPGA STATUS=OK DUR_S=$dur RPT=$RPT_DIR/rpt_fpga_${filename}.log" >> $EVENT_LOG
+        endif
+        sleep 5
+
+    else
+        # RTL / Gate Level Simulation
+        set ts0 = `date +%s`
+        echo "TS=$ts0 EVT=STAGE_START ASM=$filename STAGE=SIM STATUS=START" >> $EVENT_LOG
+        echo "> Running simulation for $filename ..." >> $STATUS_LOG
+
+        timeout 30 make system.sim >& /dev/null
+        if ( $status != 0 ) then
+            echo "> Simulation Timeout/Failure." >> $STATUS_LOG
+            set ts1 = `date +%s`
+            @ dur = $ts1 - $ts0
+            echo "TS=$ts1 EVT=STAGE_END ASM=$filename STAGE=SIM STATUS=FAIL DUR_S=$dur" >> $EVENT_LOG
+            @ fail_count++
+            continue
+        else
+            set ts1 = `date +%s`
+            @ dur = $ts1 - $ts0
+            echo "TS=$ts1 EVT=STAGE_END ASM=$filename STAGE=SIM STATUS=OK DUR_S=$dur" >> $EVENT_LOG
+        endif
+
+        sleep 2
+
+    endif
+
+    # Diff
+    set ts0 = `date +%s`
+    echo "TS=$ts0 EVT=STAGE_START ASM=$filename STAGE=DIFF STATUS=START" >> $EVENT_LOG
+    echo "> Noting differences..." >> $STATUS_LOG
+
+    diff memsim.hex $MEM_HEX >! /tmp/diff_${filename}.tmp
+    set diff_status = $status
+
+    if ( $diff_status != 0 ) then
+        @ fail_count++
+
+        set diff_lines = `wc -l < /tmp/diff_${filename}.tmp`
+
+        echo "==========================================" >> $DIFF_LOG
+        echo "MISMATCH IN FILE: $file" >> $DIFF_LOG
+        echo "==========================================" >> $DIFF_LOG
+        cat /tmp/diff_${filename}.tmp >> $DIFF_LOG
+        echo "" >> $DIFF_LOG
+
+        set ts1 = `date +%s`
+        @ dur = $ts1 - $ts0
+        echo "TS=$ts1 EVT=STAGE_END ASM=$filename STAGE=DIFF STATUS=FAIL DUR_S=$dur DIFF_LINES=$diff_lines" >> $EVENT_LOG
+    else
+        echo "==========================================" >> $DIFF_LOG
+        echo "NO MISMATCH: $file" >> $DIFF_LOG
+        echo "==========================================" >> $DIFF_LOG
+        echo "" >> $DIFF_LOG
+
+        set ts1 = `date +%s`
+        @ dur = $ts1 - $ts0
+        echo "TS=$ts1 EVT=STAGE_END ASM=$filename STAGE=DIFF STATUS=OK DUR_S=$dur" >> $EVENT_LOG
+    endif
+
+    echo "" >> $STATUS_LOG
+end
+
+# Cleanup
+make clean >& /dev/null
+
+set END_TS = `date +%s`
+
+if ( $fail_count == 0 ) then
+    echo "TS=$END_TS EVT=RUN_END ASM=ALL STAGE=RUN STATUS=OK TOTAL_ASM=$asm_count" >> $EVENT_LOG
+    echo "Done! All tests passed." >> $STATUS_LOG
+else
+    echo "TS=$END_TS EVT=RUN_END ASM=ALL STAGE=RUN STATUS=FAIL TOTAL_ASM=$asm_count FAIL_COUNT=$fail_count" >> $EVENT_LOG
+    echo "Done! $fail_count failures detected. Check diffs.txt." >> $STATUS_LOG
+endif
+
+echo "Done!"
+

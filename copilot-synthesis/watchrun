@@ -1,0 +1,66 @@
+#!/bin/bash
+
+# Configuration
+EVENT_LOG="run.events.txt"
+
+# Check webhook
+if [ -z "$DISCORD_SYNTH_WEBHOOK" ]; then
+    echo "ERROR: DISCORD_SYNTH_WEBHOOK not set"
+    exit 1
+fi
+
+# Helper function: send Discord message
+send_discord() {
+    local msg="$1"
+    curl -s -X POST -H "Content-Type: application/json" \
+        -d "{\"content\": \"$msg\"}" "$DISCORD_SYNTH_WEBHOOK" >/dev/null
+}
+
+# Optional run title
+RUN_TITLE="$1"
+
+if [ -n "$RUN_TITLE" ]; then
+    send_discord "🧪 **System Run Started**\n>> **$RUN_TITLE**"
+    echo "[watcher] Posted run title: $RUN_TITLE"
+fi
+
+echo "[watcher] Watching $EVENT_LOG ..."
+echo "[watcher] Will exit on RUN_END"
+
+# State
+declare -A seen_failures
+
+# Tail loop
+tail -n 0 -F "$EVENT_LOG" | while read -r line; do
+    # Ignore version header
+    [[ "$line" == EVT_VERSION* ]] && continue
+
+    # Extract key fields
+    evt=$(echo "$line" | sed -n 's/.*EVT=\([^ ]*\).*/\1/p')
+    asm=$(echo "$line" | sed -n 's/.*ASM=\([^ ]*\).*/\1/p')
+    stage=$(echo "$line" | sed -n 's/.*STAGE=\([^ ]*\).*/\1/p')
+    stat=$(echo "$line" | sed -n 's/.*STATUS=\([^ ]*\).*/\1/p')
+
+    # Failure notification
+    if [ "$stat" == "FAIL" ]; then
+        key="${asm}:${stage}"
+        if [ -z "${seen_failures[$key]}" ]; then
+            seen_failures[$key]=1
+            msg="❌ **FAILURE DETECTED**\nASM: $asm\nStage: $stage\nStatus: $stat"
+            send_discord "$msg"
+            echo "[watcher] Alerted failure: $asm $stage $stat"
+        fi
+    fi
+
+    # Run end notification
+    if [ "$evt" == "RUN_END" ]; then
+        if [ "$stat" == "OK" ]; then
+            msg="✅ **RUN COMPLETE**\nAll assembly files passed."
+        else
+            msg="⚠️ **RUN COMPLETE WITH FAILURES**\nCheck diffs.txt for details."
+        fi
+        send_discord "$msg"
+        echo "[watcher] Run ended. Exiting."
+        exit 0
+    fi
+done
