@@ -1,24 +1,39 @@
 #!/bin/tcsh
 
 # Argument parsing
-set DO_SYNTH = 0
-set DO_FPGA = 0
-set FILTER   = ""
+set DO_SYNTH   = 0
+set DO_FPGA    = 0
+set BUILD_LIST = 0
+set FILT_LIST  = ()
+set FILT_SING  = ""
 
 foreach arg ( $argv )
     if ( "$arg" == "-t" ) then
         set DO_SYNTH = 1
+        set BUILD_LIST = 0
     else if ( "$arg" == "-f" ) then
         set DO_FPGA = 1
+        set BUILD_LIST = 0
+    else if ( "$arg" == "-l" ) then
+        set BUILD_LIST = 1
     else
-        set FILTER = "$arg"
+        if ( $BUILD_LIST ) then
+            set FILT_LIST = ( $FILT_LIST "$arg" )
+        else
+            set FILT_SING = "$arg"
+        endif
     endif
 end
 
-if ( "$FILTER" != "" ) then
-    set ASM_GLOB = "asmFiles/${FILTER}*"
+if ( $#FILT_LIST > 0 ) then
+    set ASM_GLOB = ()
+    foreach f ( $FILT_LIST )
+        set ASM_GLOB = ( $ASM_GLOB asmFiles/${f}* )
+    end
+else if ( "$FILT_SING" != "" ) then
+    set ASM_GLOB = ( asmFiles/${FILT_SING}* )
 else
-    set ASM_GLOB = "asmFiles/*.asm"
+    set ASM_GLOB = ( asmFiles/*.asm )
 endif
 
 # Configuration
@@ -104,11 +119,11 @@ foreach file ( $ASM_GLOB )
         echo "> Synthesizing design for $filename ..." >> $STATUS_LOG
 
         make system.syntp >&! $RPT_DIR/rpt_${filename}.txt
-        sleep 1
+        sleep 2
 
         set ts1 = `date +%s`
         @ dur = $ts1 - $ts0
-        echo "TS=$ts1 EVT=STAGE_END ASM=$filename STAGE=SYNTH STATUS=OK DUR_S=$dur RPT=$RPT_DIR/rpt_${filename}.log" >> $EVENT_LOG
+        echo "TS=$ts1 EVT=STAGE_END ASM=$filename STAGE=SYNTH STATUS=OK DUR_S=$dur RPT=$RPT_DIR/rpt_${filename}.txt" >> $EVENT_LOG
     endif
 
     # FPGA Testing
@@ -122,13 +137,13 @@ foreach file ( $ASM_GLOB )
             echo "> FPGA Implementation Timeout/Failure." >> $STATUS_LOG
             set ts1 = `date +%s`
             @ dur = $ts1 - $ts0
-            echo "TS=$ts1 EVT=STAGE_END ASM=$filename STAGE=FPGA STATUS=FAIL DUR_S=$dur RPT=$RPT_DIR/rpt_fpga_${filename}.log" >> $EVENT_LOG
+            echo "TS=$ts1 EVT=STAGE_END ASM=$filename STAGE=FPGA STATUS=TIMEOUT DUR_S=$dur RPT=$RPT_DIR/rpt_fpga_${filename}.txt" >> $EVENT_LOG
             @ fail_count++
             continue
         else
             set ts1 = `date +%s`
             @ dur = $ts1 - $ts0
-            echo "TS=$ts1 EVT=STAGE_END ASM=$filename STAGE=FPGA STATUS=OK DUR_S=$dur RPT=$RPT_DIR/rpt_fpga_${filename}.log" >> $EVENT_LOG
+            echo "TS=$ts1 EVT=STAGE_END ASM=$filename STAGE=FPGA STATUS=OK DUR_S=$dur RPT=$RPT_DIR/rpt_fpga_${filename}.txt" >> $EVENT_LOG
         endif
         sleep 5
 
@@ -138,12 +153,13 @@ foreach file ( $ASM_GLOB )
         echo "TS=$ts0 EVT=STAGE_START ASM=$filename STAGE=SIM STATUS=START" >> $EVENT_LOG
         echo "> Running simulation for $filename ..." >> $STATUS_LOG
 
-        timeout 30 make system.sim >& /dev/null
+        timeout 60 make system.sim >& /dev/null
         if ( $status != 0 ) then
             echo "> Simulation Timeout/Failure." >> $STATUS_LOG
+            echo "" >> $STATUS_LOG
             set ts1 = `date +%s`
             @ dur = $ts1 - $ts0
-            echo "TS=$ts1 EVT=STAGE_END ASM=$filename STAGE=SIM STATUS=FAIL DUR_S=$dur" >> $EVENT_LOG
+            echo "TS=$ts1 EVT=STAGE_END ASM=$filename STAGE=SIM STATUS=TIMEOUT DUR_S=$dur" >> $EVENT_LOG
             @ fail_count++
             continue
         else
@@ -151,7 +167,6 @@ foreach file ( $ASM_GLOB )
             @ dur = $ts1 - $ts0
             echo "TS=$ts1 EVT=STAGE_END ASM=$filename STAGE=SIM STATUS=OK DUR_S=$dur" >> $EVENT_LOG
         endif
-
         sleep 2
 
     endif
@@ -206,4 +221,3 @@ else
 endif
 
 echo "Done!"
-

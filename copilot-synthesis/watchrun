@@ -41,17 +41,6 @@ tail -n 0 -F "$EVENT_LOG" | while read -r line; do
     stage=$(echo "$line" | sed -n 's/.*STAGE=\([^ ]*\).*/\1/p')
     stat=$(echo "$line" | sed -n 's/.*STATUS=\([^ ]*\).*/\1/p')
 
-    # Failure notification
-    if [ "$stat" == "FAIL" ]; then
-        key="${asm}:${stage}"
-        if [ -z "${seen_failures[$key]}" ]; then
-            seen_failures[$key]=1
-            msg="❌ **FAILURE DETECTED**\nASM: $asm\nStage: $stage\nStatus: $stat"
-            send_discord "$msg"
-            echo "[watcher] Alerted failure: $asm $stage $stat"
-        fi
-    fi
-
     # Run end notification
     if [ "$evt" == "RUN_END" ]; then
         if [ "$stat" == "OK" ]; then
@@ -62,5 +51,16 @@ tail -n 0 -F "$EVENT_LOG" | while read -r line; do
         send_discord "$msg"
         echo "[watcher] Run ended. Exiting."
         exit 0
+    fi
+
+    # Failure notification
+    if [[ "$stat" == "FAIL" || "$stat" == "TIMEOUT" ]]; then
+        key="${asm}:${stage}"
+        if [ -z "${seen_failures[$key]}" ]; then
+            seen_failures[$key]=1
+            msg="❌ **FAILURE DETECTED**\nASM: $asm\nStage: $stage\nStatus: $stat"
+            send_discord "$msg"
+            echo "[watcher] Alerted failure: $asm $stage $stat"
+        fi
     fi
 done
