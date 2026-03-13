@@ -1,0 +1,72 @@
+#!/bin/bash
+
+SESSION="synth"
+
+SUPER_ARGS=()
+WATCH_TITLE=""
+RUN_WATCHER=0
+
+MODE=""
+
+for arg in "$@"; do
+    case "$arg" in
+        -s)
+            MODE="super"
+            ;;
+        -w)
+            MODE="watch"
+            RUN_WATCHER=1
+            ;;
+        -h)
+            echo "Usage:" 
+            echo "  runtest -s <supercheck args...> [-w <watchrun title>]"
+            echo ""
+            echo "Options:"
+            echo "  -s  supercheck"
+            echo "  -w  watchrun"
+            echo "  -h  help message"
+            exit 0
+            ;;
+        *)
+            if [[ "$MODE" == "super" ]]; then
+                SUPER_ARGS+=("$arg")
+            elif [[ "$MODE" == "watch" ]]; then
+                WATCH_TITLE="$arg"
+                MODE=""   # only one arg allowed
+            else
+                echo "Unknown argument: $arg"
+                exit 1
+            fi
+            ;;
+    esac
+done
+
+if [ ${#SUPER_ARGS[@]} -eq 0 ]; then
+    echo "ERROR: -s must provide arguments for supercheck"
+    exit 1
+fi
+
+if [ -z "$TMUX" ]; then
+    tmux kill-session -t $SESSION 2>/dev/null
+    tmux new-session -d -s $SESSION
+    if [ $RUN_WATCHER -eq 1 ]; then
+        tmux send-keys -t $SESSION "watchrun \"$WATCH_TITLE\"" C-m
+        tmux split-window -h -t $SESSION
+        tmux send-keys -t $SESSION "supercheck ${SUPER_ARGS[*]}" C-m
+        tmux select-layout -t $SESSION even-horizontal
+    else
+        tmux send-keys -t $SESSION "supercheck ${SUPER_ARGS[*]}" C-m
+    fi
+else
+    tmux kill-window -t synth 2>/dev/null
+    tmux new-window -d -n synth
+    if [ $RUN_WATCHER -eq 1 ]; then
+        tmux split-window -d -h -t synth
+        tmux send-keys -t synth.1 "watchrun \"$WATCH_TITLE\"" C-m
+        tmux send-keys -t synth.2 "supercheck ${SUPER_ARGS[*]}" C-m
+        tmux select-layout -t synth even-horizontal
+    else
+        tmux send-keys -t synth "supercheck ${SUPER_ARGS[*]}" C-m
+    fi
+fi
+
