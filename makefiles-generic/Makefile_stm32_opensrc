@@ -1,0 +1,121 @@
+# ./Makefile
+
+# This is for managing STMCubeMX generated projects for STM32 programming.
+# Configure the Toolchain/IDE as cmake and set the variables below correctly.
+# Meant for use on Windows, uses all open source tools for development.
+
+# Parameters
+PROJECT = stm32f7_fulltest
+INTERFACE = interface/stlink.cfg
+TARGET = target/stm32f7x.cfg
+BAUD = 115200
+
+# COM Port
+SERIAL_PORT ?= $(shell powershell -NoProfile -Command "(Get-CimInstance Win32_SerialPort | Where-Object Description -Match 'STLink' | Select-Object -First 1 -ExpandProperty DeviceID)")
+SERIAL_PORT ?= COM6
+
+# Tools
+OPENOCD = openocd
+GDB = arm-none-eabi-gdb
+CPPCHECK = cppcheck
+
+# Outputs
+BUILD_DIR = build
+ELF = $(BUILD_DIR)/$(PROJECT).elf
+DEBUG_FILE = openocd_log.txt
+
+# Colors
+COLOR_RESET=\033[0m
+COLOR_BOLD=\033[1m
+COLOR_GREEN=\033[32m
+COLOR_CYAN=\033[36m
+
+# Commands
+.PHONY: all check-build kill-openocd setup lint build size flash monitor run debug clean veryclean help
+
+all: build
+
+check-build:
+	@if [ ! -d "$(BUILD_DIR)" ]; then \
+		echo "Error: build directory missing."; \
+		echo "Run 'make setup' first."; \
+		exit 1; \
+	fi
+
+kill-openocd:
+	@taskkill /IM openocd.exe /F >nul 2>&1 || true
+
+setup:
+	@cmake -G Ninja -B $(BUILD_DIR) -DCMAKE_TOOLCHAIN_FILE=cmake/gcc-arm-none-eabi.cmake
+
+lint:
+	@$(CPPCHECK) --enable=warning,performance,portability \
+	         --inline-suppr \
+	         --suppress=missingIncludeSystem \
+	         --suppress=unmatchedSuppression \
+	         --error-exitcode=1 \
+	Core/Src
+
+build: check-build
+	@if [ -d "$(BUILD_DIR)" ]; then \
+		cmake --build $(BUILD_DIR); \
+	fi
+
+size: build
+	@arm-none-eabi-size $(ELF)
+
+flash: build
+	@$(OPENOCD) -f $(INTERFACE) -f $(TARGET) -c "program $(ELF) verify reset exit"
+
+monitor:
+	@echo "Opening serial monitor on $(SERIAL_PORT) @ $(BAUD)"
+	plink -serial $(SERIAL_PORT) -sercfg $(BAUD),8,n,1,N
+
+run: flash monitor
+
+debug: build kill-openocd
+	@echo "Starting OpenOCD..."
+	@$(OPENOCD) -f $(INTERFACE) -f $(TARGET) > $(DEBUG_FILE) 2>&1 & \
+	echo $$! > .openocd_pid
+	@sleep 2
+	@echo "Starting GDB..."
+	-$(GDB) "$(ELF)" \
+		-ex "target extended-remote :3333" \
+		-ex "monitor reset halt" \
+		-ex "load"
+	@echo "Stopping OpenOCD..."
+	-@kill `cat .openocd_pid` 2>/dev/null
+	@rm -f .openocd_pid
+
+clean:
+	@if [ -d "$(BUILD_DIR)" ]; then \
+		cmake --build $(BUILD_DIR) --target clean; \
+	fi
+	@rm -f $(DEBUG_FILE)
+
+veryclean:
+	@rm -rf $(BUILD_DIR) $(DEBUG_FILE)
+
+help:
+	@echo -e "$(COLOR_BOLD)STM32 Embedded Project Makefile$(COLOR_RESET)"
+	@echo -e "Usage: make [target]"
+	@echo ""
+	@echo -e "$(COLOR_CYAN)General Commands:$(COLOR_RESET)"
+	@echo -e "  $(COLOR_GREEN)help$(COLOR_RESET)       : Print this help message."
+	@echo -e "  $(COLOR_GREEN)setup$(COLOR_RESET)      : Configure CMake project (run once)."
+	@echo -e "  $(COLOR_GREEN)build$(COLOR_RESET)      : Compile firmware using CMake/Ninja."
+	@echo -e "  $(COLOR_GREEN)size$(COLOR_RESET)       : Display compiled firmware size."
+	@echo -e "  $(COLOR_GREEN)lint$(COLOR_RESET)       : Run cppcheck static analysis."
+	@echo -e "  $(COLOR_GREEN)clean$(COLOR_RESET)      : Clean build artifacts."
+	@echo -e "  $(COLOR_GREEN)veryclean$(COLOR_RESET)  : Remove build directory completely."
+	@echo ""
+	@echo -e "$(COLOR_CYAN)Hardware Commands:$(COLOR_RESET)"
+	@echo -e "  $(COLOR_GREEN)flash$(COLOR_RESET)      : Flash firmware to MCU using OpenOCD."
+	@echo -e "  $(COLOR_GREEN)monitor$(COLOR_RESET)    : Open UART monitor on $(SERIAL_PORT) @ $(BAUD)."
+	@echo -e "  $(COLOR_GREEN)run$(COLOR_RESET)        : Flash firmware then open serial monitor."
+	@echo -e "  $(COLOR_GREEN)debug$(COLOR_RESET)      : Start OpenOCD and launch GDB debugging session."
+	@echo ""
+	@echo -e "$(COLOR_CYAN)Project Info:$(COLOR_RESET)"
+	@echo -e "  Project Name : $(PROJECT)"
+	@echo -e "  ELF Output   : $(ELF)"
+	@echo -e "  Build Dir    : $(BUILD_DIR)"
