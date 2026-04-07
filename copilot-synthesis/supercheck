@@ -7,13 +7,62 @@ set BUILD_LIST = 0
 set FILT_LIST  = ()
 set FILT_SING  = ""
 
+set CLEAN = 1
+set SIM_FLAGS = ""
+
+onintr cleanup
+
+# Multiple run protection
+set LOCKFILE = ".supercheck.lock"
+if ( -e $LOCKFILE ) then
+    echo "Error: $LOCKFILE found."
+    echo "Kill the existing process before starting another."
+    echo "Lock Details:"
+    cat $LOCKFILE
+    exit 1
+endif
+
+echo -n "" >! $LOCKFILE
+echo "user  :   $USER" >> $LOCKFILE
+echo "host  :   `hostname`" >> $LOCKFILE
+echo "pid   :   $$" >> $LOCKFILE
+echo "start :   `date`" >> $LOCKFILE
+echo "cwd   :   `pwd`" >> $LOCKFILE
+echo "cmd   :   supercheck $argv" >> $LOCKFILE
+
+# Run settings
 foreach arg ( $argv )
-    if ( "$arg" == "-t" ) then
+    if ( "$arg" == "-synth" ) then
         set DO_SYNTH = 1
         set BUILD_LIST = 0
-    else if ( "$arg" == "-f" ) then
+    else if ( "$arg" == "-fpga" ) then
         set DO_FPGA = 1
         set BUILD_LIST = 0
+    else if ( "$arg" == "-caches" ) then
+        set SIM_FLAGS = "-c"
+        set BUILD_LIST = 0
+    else if ( "$arg" == "-mcore" ) then
+        set SIM_FLAGS = "-m"
+        set BUILD_LIST = 0
+    else if ( "$arg" == "-fast" ) then
+        set CLEAN = 0
+        set BUILD_LIST = 0
+    else if ( "$arg" == "-h" ) then
+        echo "Usage:"
+        echo "  supercheck -l <patterns> [mode] [flags]"
+        echo ""
+        echo "Modes:"
+        echo "  -synth  : Synthesis"
+        echo "  -fpga   : FPGA Test"
+        echo "  -h      : You're seeing it."
+        echo ""
+        echo "Flags:"
+        echo "  -caches : Simulate with caches"
+        echo "  -mcore  : Simulate with multicore"
+        echo "  -fast   : No intermediate cleaning in RTL/synth"
+        echo "            Use ONLY if yk what you're doing!"
+        rm -f $LOCKFILE >& /dev/null
+        exit 0
     else if ( "$arg" == "-l" ) then
         set BUILD_LIST = 1
     else
@@ -64,14 +113,22 @@ if ( $DO_FPGA ) then
         set ts0 = `date +%s`
         echo "TS=$START_TS EVT=RUN_END ASM=NONE STAGE=HOST STATUS=FAIL DUR_S=0" >> $EVENT_LOG
 
+        rm -f $LOCKFILE >& /dev/null
         exit 1
     endif
 endif
 
-make clean >& /dev/null
+# Setup
+
+if ( $CLEAN || $DO_FPGA ) then
+    make clean >& /dev/null
+endif
+
 if ( $DO_SYNTH || $DO_FPGA ) then
     mkdir -p $RPT_DIR
-    rm -rf $RPT_DIR/* >& /dev/null
+    if ( $DO_FPGA ) then
+        rm -rf $RPT_DIR/* >& /dev/null
+    endif
 endif
 
 echo -n "" >! $STATUS_LOG
@@ -84,13 +141,13 @@ echo "TS=$START_TS EVT=RUN_START ASM=ALL STAGE=RUN STATUS=START" >> $EVENT_LOG
 
 set fail_count = 0
 set asm_count  = 0
+set synth_done = 0
 
 # Main loop
 foreach file ( $ASM_GLOB )
 
     if ( ! -e "$file" ) continue
 
-    make clean >& /dev/null
     sleep 1
 
     @ asm_count++
@@ -106,20 +163,43 @@ foreach file ( $ASM_GLOB )
     echo "> Simulating assembly file $file ..." >> $STATUS_LOG
 
     asm "$file"
-    sim >& /dev/null
+    timeout 30 sim $SIM_FLAGS >& /dev/null
+    if ( $status != 0 ) then
+        echo "> ASM Simulation Timeout/Failure." >> $STATUS_LOG
+        echo "" >> $STATUS_LOG
+        set ts1 = `date +%s`
+        @ dur = $ts1 - $ts0
+        echo "TS=$ts1 EVT=STAGE_END ASM=$filename STAGE=ASM STATUS=TIMEOUT DUR_S=$dur" >> $EVENT_LOG
+        @ fail_count++
+        @ synth_done = 0
+        make clean >& /dev/null
+        continue
+    endif
 
     set ts1 = `date +%s`
     @ dur = $ts1 - $ts0
     echo "TS=$ts1 EVT=STAGE_END ASM=$filename STAGE=ASM STATUS=OK DUR_S=$dur" >> $EVENT_LOG
 
-    # Synthesis
-    if ( $DO_SYNTH ) then
+    # Synthesis (done once if cleaned)
+    if ( $DO_SYNTH && $synth_done == 0 && $CLEAN ) then
         set ts0 = `date +%s`
         echo "TS=$ts0 EVT=STAGE_START ASM=$filename STAGE=SYNTH STATUS=START" >> $EVENT_LOG
         echo "> Synthesizing design for $filename ..." >> $STATUS_LOG
 
-        make system.syntp >&! $RPT_DIR/rpt_${filename}.txt
+        timeout 600 make system.syntp >&! $RPT_DIR/rpt_${filename}.txt
+        if ( $status != 0 ) then
+            echo "> Project Synthesis Timeout/Failure." >> $STATUS_LOG
+            echo "" >> $STATUS_LOG
+            set ts1 = `date +%s`
+            @ dur = $ts1 - $ts0
+            echo "TS=$ts1 EVT=STAGE_END ASM=$filename STAGE=SYNTH STATUS=TIMEOUT DUR_S=$dur RPT=$RPT_DIR/rpt_${filename}.txt" >> $EVENT_LOG
+            @ fail_count++
+            @ synth_done = 0
+            make clean >& /dev/null
+            continue
+        endif
         sleep 2
+        @ synth_done = 1
 
         set ts1 = `date +%s`
         @ dur = $ts1 - $ts0
@@ -132,13 +212,15 @@ foreach file ( $ASM_GLOB )
         echo "TS=$ts0 EVT=STAGE_START ASM=$filename STAGE=FPGA STATUS=START" >> $EVENT_LOG
         echo "> Testing FPGA Implementation for $filename ..." >> $STATUS_LOG
 
-        timeout 600 synthesize_xilinx -m -d -p -t -f 100 system_fpga >&! $RPT_DIR/rpt_fpga_${filename}.txt
+        timeout 600 synthesize_xilinx -m -d -p -t -f 200 system_fpga >&! $RPT_DIR/rpt_fpga_${filename}.txt
         if ( $status != 0 ) then
             echo "> FPGA Implementation Timeout/Failure." >> $STATUS_LOG
+            echo "" >> $STATUS_LOG
             set ts1 = `date +%s`
             @ dur = $ts1 - $ts0
             echo "TS=$ts1 EVT=STAGE_END ASM=$filename STAGE=FPGA STATUS=TIMEOUT DUR_S=$dur RPT=$RPT_DIR/rpt_fpga_${filename}.txt" >> $EVENT_LOG
             @ fail_count++
+            make clean >& /dev/null
             continue
         else
             set ts1 = `date +%s`
@@ -161,6 +243,8 @@ foreach file ( $ASM_GLOB )
             @ dur = $ts1 - $ts0
             echo "TS=$ts1 EVT=STAGE_END ASM=$filename STAGE=SIM STATUS=TIMEOUT DUR_S=$dur" >> $EVENT_LOG
             @ fail_count++
+            @ synth_done = 0
+            make clean >& /dev/null
             continue
         else
             set ts1 = `date +%s`
@@ -208,7 +292,10 @@ foreach file ( $ASM_GLOB )
 end
 
 # Cleanup
-make clean >& /dev/null
+
+if ( $CLEAN || $DO_FPGA ) then
+    make clean >& /dev/null
+endif
 
 set END_TS = `date +%s`
 
@@ -217,7 +304,16 @@ if ( $fail_count == 0 ) then
     echo "Done! All tests passed." >> $STATUS_LOG
 else
     echo "TS=$END_TS EVT=RUN_END ASM=ALL STAGE=RUN STATUS=FAIL TOTAL_ASM=$asm_count FAIL_COUNT=$fail_count" >> $EVENT_LOG
-    echo "Done! $fail_count failures detected. Check diffs.txt." >> $STATUS_LOG
+    echo "Done! $fail_count failures detected. Check diffs.txt and build files." >> $STATUS_LOG
 endif
 
 echo "Done!"
+
+rm -f $LOCKFILE >& /dev/null
+exit 0
+
+cleanup:
+    echo "[supercheck] Process interrupted."
+    rm -f $LOCKFILE >& /dev/null
+    exit 1
+
