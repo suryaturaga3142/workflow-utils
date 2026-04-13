@@ -24,7 +24,7 @@ send_discord() {
 RUN_TITLE="$1"
 
 if [ -n "$RUN_TITLE" ]; then
-    send_discord "🧪 **System Run Started**\n>> **$RUN_TITLE**"
+    send_discord "🧪 **System Run Started**\n> **$RUN_TITLE**"
     echo "[watcher] Posted run title: $RUN_TITLE"
 fi
 
@@ -49,15 +49,15 @@ tail -n 0 -F "$EVENT_LOG" | while read -r line; do
     # Run end notification
     if [ "$evt" == "RUN_END" ]; then
         if [ "$stat" == "OK" ]; then
-            msg="✅ **RUN COMPLETE**\nAll assembly files passed."
+            msg="✅ **RUN COMPLETE**\n> All assembly files passed."
         elif [ "$stat" == "INTR" ]; then
-            msg="💥 **RUN INTERRUPTED**\nCheck run.events.txt for details."
+            msg="💥 **RUN INTERRUPTED**\n> Check \`run.events.txt\` for details."
         elif [ "$stat" == "HALT" ]; then
-            msg="🛑 **RUN HALTED**\nCheck run files for details."
+            msg="🛑 **RUN HALTED**\n> Check run files for details."
         elif [ "$stat" == "BLOCK" ]; then
-            msg="🚫 **RUN BLOCKED**\nCrucial setup detail failed."
+            msg="🚫 **RUN BLOCKED**\n> Crucial setup requirement unmet."
         else
-            msg="⚠️ **RUN COMPLETE WITH FAILURES**\nCheck run files for details."
+            msg="⚠️ **RUN COMPLETE WITH FAILURES**\n> Check run files for details."
         fi
         send_discord "$msg"
         echo "[watcher] Run ended. Exiting."
@@ -69,7 +69,7 @@ tail -n 0 -F "$EVENT_LOG" | while read -r line; do
         key="${asm}:${stage}"
         if [ -z "${seen_failures[$key]}" ]; then
             seen_failures[$key]=1
-            msg="❌ **FAILURE DETECTED**\nASM: $asm\nStage: $stage\nStatus: $stat\nExit Code: $exit_code"
+            msg="❌ **FAILURE DETECTED**\n> ASM: \`$asm\`\n> Stage: $stage\n> Status: $stat\n> Exit Code: $exit_code"
             send_discord "$msg"
             echo "[watcher] Alerted failure: $asm $stage $stat $exit_code"
         fi
