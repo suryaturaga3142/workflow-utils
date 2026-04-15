@@ -24,13 +24,17 @@ set DO_SYNTH   = 0
 set DO_FPGA    = 0
 set CLEAN      = 1
 set HALT       = 0
-set TRACE      = 0
+set ASM_TRACE  = 0
+set SIM_TRACE  = 0
 # Runtime fileset
 set LOCKFILE   = ".supercheck.lock"
 set EVENT_LOG  = run.events.txt
 set STATUS_LOG = status.txt
 set DIFF_LOG   = diffs.txt
-set TRACE_LOG  = trace.txt
+set ASM_TR_LOG = trace.asm.txt
+set ASM_C0_LOG = trace.core0.txt
+set ASM_C1_LOG = trace.core1.txt
+set SIM_TR_LOG = trace.sim.txt
 set RPT_DIR    = my-rpts
 set FPGA_DIR   = my-fpga-rpts
 set MEM_HEX    = memcpu.hex
@@ -65,8 +69,11 @@ foreach arg ( $argv )
     else if ( "$arg" == "-halt" ) then
         set HALT = 1
         set BUILD_LIST = 0
-    else if ( "$arg" == "-trace" ) then
-        set TRACE = 1
+    else if ( "$arg" == "-asmtrace" ) then
+        set ASM_TRACE = 1
+        set BUILD_LIST = 0
+    else if ( "$arg" == "-simtrace" ) then
+        set SIM_TRACE = 1
         set BUILD_LIST = 0
     else if ( "$arg" == "-h" ) then
         echo "Usage:"
@@ -84,10 +91,11 @@ foreach arg ( $argv )
         echo ""
         echo "Flags:"
         echo "  -h          : You're seeing it."
-        echo "  -fast       : No intermediate cleaning in RTL/synth"
+        echo "  -fast       : Minimum cleaning in RTL/synth success"
         echo "                Use ONLY if yk what you're doing!"
         echo "  -halt       : Halt execution at first failure"
-        echo "  -trace      : Trace first fail / last success simulation"
+        echo "  -asmtrace   : Trace first test case fail assembly file"
+        echo "  -simtrace   : Trace first test case fail simulation"
         echo ""
         exit 0
     else if ( "$arg" == "-l" ) then
@@ -176,7 +184,11 @@ endif
 echo -n "" >! $STATUS_LOG
 echo -n "" >! $DIFF_LOG
 echo -n "" >! $EVENT_LOG
-echo -n "" >! $TRACE_LOG
+echo -n "" >! $ASM_TR_LOG
+echo -n "" >! $ASM_C0_LOG
+echo -n "" >! $ASM_C1_LOG
+echo -n "" >! $SIM_TR_LOG
+
 # Start event logs
 set ts0 = `date +%s`
 echo "EVT_VERSION=1" >> $EVENT_LOG
@@ -205,9 +217,6 @@ foreach file ( $ASM_GLOB )
     sleep 1
 
     if ( $HALT == 1 && $fail_count != 0 ) then
-        if ( $CLEAN || $DO_FPGA ) then
-            make clean >& /dev/null
-        endif
         set END_TS = `date +%s`
         echo "TS=$END_TS EVT=RUN_END ASM=ALL STAGE=RUN STATUS=HALT TOTAL_ASM=$asm_count FAIL_COUNT=$fail_count" >> $EVENT_LOG
         echo "Done! Failed and halted. Check diffs.txt and build files." >> $STATUS_LOG
@@ -226,15 +235,21 @@ foreach file ( $ASM_GLOB )
     # ASM simulation
     set ts0 = `date +%s`
     echo "TS=$ts0 EVT=STAGE_START ASM=$filename STAGE=ASM STATUS=START" >> $EVENT_LOG
-    echo "> Simulating assembly file $file ..." >> $STATUS_LOG
+    echo "> Simulating assembly file $filename ..." >> $STATUS_LOG
 
     asm "$file"
-    if ( $TRACE == 1 && $trace_done == 0 ) then
-        timeout $ASM_TIME sim $SIM_FLAGS | tail -n 100 >&! $TRACE_LOG
-        set exit_code = $status
-    else
-        timeout $ASM_TIME sim $SIM_FLAGS >& /dev/null
-        set exit_code = $status
+    timeout $ASM_TIME sim $SIM_FLAGS -t >&! /tmp/asm_trace_${filename}_${USER}.tmp
+    set exit_code = $status
+    if ( $ASM_TRACE == 1 && $trace_done == 0 ) then
+        echo "ASM: ${filename}\n" >! $ASM_TR_LOG
+        echo "ASM: ${filename}\n" >! $ASM_C0_LOG
+        echo "ASM: ${filename}\n" >! $ASM_C1_LOG
+        cat /tmp/asm_trace_${filename}_${USER}.tmp | tail -n 100 >> $ASM_TR_LOG
+        cat /tmp/asm_trace_${filename}_${USER}.tmp | grep "(Core 0)" | head -n 100 >> $ASM_C0_LOG
+        cat /tmp/asm_trace_${filename}_${USER}.tmp | grep "(Core 1)" | head -n 100 >> $ASM_C1_LOG
+        echo "" >> $ASM_TR_LOG
+        echo "" >> $ASM_C0_LOG
+        echo "" >> $ASM_C1_LOG
     endif
     if ( $exit_code != 0 ) then
         if ( $exit_code == 124 ) then
@@ -254,7 +269,7 @@ foreach file ( $ASM_GLOB )
         @ synth_done = 0
         @ trace_done = 1
         @ exit_code = 0
-        make clean >& /dev/null
+        if ( $HALT == 0 ) make clean >& /dev/null
         continue
     endif
 
@@ -287,7 +302,7 @@ foreach file ( $ASM_GLOB )
             @ fail_count++
             @ synth_done = 0
             @ exit_code = 0
-            make clean >& /dev/null
+            if ( $HALT == 0 ) make clean >& /dev/null
             continue
         endif
         sleep 2
@@ -322,7 +337,7 @@ foreach file ( $ASM_GLOB )
             endif
             @ fail_count++
             @ exit_code = 0
-            make clean >& /dev/null
+            if ( $HALT == 0 ) make clean >& /dev/null
             continue
         else
             set ts1 = `date +%s`
@@ -337,12 +352,12 @@ foreach file ( $ASM_GLOB )
         echo "TS=$ts0 EVT=STAGE_START ASM=$filename STAGE=SIM STATUS=START" >> $EVENT_LOG
         echo "> Running simulation for $filename ..." >> $STATUS_LOG
 
-        if ( $TRACE == 1 && $trace_done == 0 ) then
-            timeout $SIM_TIME make system.sim | tail -n 500 >>& $TRACE_LOG
-            set exit_code = $status
-        else
-            timeout $SIM_TIME make system.sim >& /dev/null
-            set exit_code = $status
+        timeout $SIM_TIME make system.sim >&! /tmp/sim_trace_${filename}_${USER}.tmp
+        set exit_code = $status
+        if ( $SIM_TRACE == 1 && $trace_done == 0 ) then
+            echo "ASM: $filename\n" >! $SIM_TR_LOG
+            cat /tmp/sim_trace_${filename}_${USER}.tmp | tail -n 500 >> $SIM_TR_LOG
+            echo "" >> $SIM_TR_LOG
         endif
         if ( $exit_code != 0 ) then
             if ( $exit_code == 124 ) then
@@ -362,7 +377,7 @@ foreach file ( $ASM_GLOB )
             @ synth_done = 0
             @ trace_done = 1
             @ exit_code = 0
-            make clean >& /dev/null
+            if ( $HALT == 0 ) make clean >& /dev/null
             continue
         else
             set ts1 = `date +%s`
@@ -387,7 +402,7 @@ foreach file ( $ASM_GLOB )
         set diff_lines = `wc -l < /tmp/diff_${filename}_${USER}.tmp`
 
         echo "==========================================" >> $DIFF_LOG
-        echo "MISMATCH IN FILE: $file" >> $DIFF_LOG
+        echo "MISMATCH IN FILE: $filename" >> $DIFF_LOG
         echo "==========================================" >> $DIFF_LOG
         cat /tmp/diff_${filename}_${USER}.tmp >> $DIFF_LOG
         echo "" >> $DIFF_LOG
@@ -397,7 +412,7 @@ foreach file ( $ASM_GLOB )
         echo "TS=$ts1 EVT=STAGE_END ASM=$filename STAGE=DIFF STATUS=FAIL DUR_S=$dur DIFF_LINES=$diff_lines" >> $EVENT_LOG
     else
         echo "==========================================" >> $DIFF_LOG
-        echo "NO MISMATCH: $file" >> $DIFF_LOG
+        echo "NO MISMATCH: $filename" >> $DIFF_LOG
         echo "==========================================" >> $DIFF_LOG
         echo "" >> $DIFF_LOG
 
@@ -411,8 +426,9 @@ end
 
 # Cleanup
 
+# Needed if clean mode, FPGA, not halt, or success run
 if ( $CLEAN || $DO_FPGA ) then
-    make clean >& /dev/null
+    if ( $HALT == 0 || $fail_count == 0 ) make clean >& /dev/null
 endif
 
 set END_TS = `date +%s`
