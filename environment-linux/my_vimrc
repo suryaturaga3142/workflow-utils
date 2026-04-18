@@ -54,7 +54,7 @@ set autoindent              " Copy indent from previous line
 " Language Specifics
 autocmd FileType python setlocal expandtab tabstop=4 shiftwidth=4
 autocmd FileType c,cpp,verilog,systemverilog setlocal tabstop=4 shiftwidth=4 shiftround
-autocmd BufRead,BufNewFile *.sv set filetype=systemverilog
+autocmd BufRead,BufNewFile *.sv,*.vh set filetype=systemverilog
 
 " --- Backup Management ---
 " Prevents cluttering project folders with swp/backup files

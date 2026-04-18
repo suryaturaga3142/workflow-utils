@@ -8,8 +8,10 @@ bind C-a send-prefix
 set -g mouse on
 
 # Fix colors for Gruvbox/Vim
-set -g default-terminal "screen-256color"
-set -ag terminal-overrides ",xterm-256color:RGB"
+set -g default-terminal "xterm-256color"
+#set -ag terminal-overrides ",xterm-256color:RGB"
+#set -g default-terminal "xterm"
+set-option -g update-environment "DISPLAY"
 
 # Start window/pane numbering at 1
 set -g base-index 1
@@ -40,10 +42,10 @@ bind -r Up resize-pane -U 5
 bind -r Right resize-pane -R 5
 
 # --- Moving Panes (Prefix + H/J/K/L) ---
-#bind H swap-pane -L
-#bind J swap-pane -D
-#bind K swap-pane -U
-#bind L swap-pane -R
+# bind H swap-pane -L
+# bind J swap-pane -D
+# bind K swap-pane -U
+# bind L swap-pane -R
 bind H select-pane -L \; swap-pane -s '!'
 bind J select-pane -D \; swap-pane -s '!'
 bind K select-pane -U \; swap-pane -s '!'
@@ -62,7 +64,7 @@ unbind %
 bind c new-window -c "#{pane_current_path}"
 
 # Move to Next/Prev Window (Prefix + l / Prefix + h)
-# Matches Vim logic (Space + l / Space + h)
+# Matches your Vim logic (Space + l / Space + h)
 bind l next-window
 bind h previous-window
 
@@ -85,16 +87,7 @@ set -g status-position bottom
 
 set -g @tmux_power_theme 'everforest'
 
-set -g @tmux_power_date_icon           ' '
-set -g @tmux_power_time_icon           ' '
-set -g @tmux_power_user_icon           ' '
-set -g @tmux_power_session_icon        ' '
-set -g @tmux_power_right_arrow_icon    ''
-set -g @tmux_power_left_arrow_icon     ''
-set -g @tmux_power_upload_speed_icon   ' '
-set -g @tmux_power_download_speed_icon ' '
-
-set -g @tmux_power_show_user    false
+set -g @tmux_power_show_user    true
 set -g @tmux_power_show_host    true
 set -g @tmux_power_show_session true
 
@@ -102,9 +95,17 @@ set -g @tmux_power_date_format '%d-%m-%Y'
 set -g @tmux_power_show_upload_speed   true
 set -g @tmux_power_show_download_speed true
 
+set -g @tmux_power_date_icon           ' '
+set -g @tmux_power_time_icon           ' '
+set -g @tmux_power_user_icon           ''
+set -g @tmux_power_session_icon        ' '
+set -g @tmux_power_right_arrow_icon    ''
+set -g @tmux_power_left_arrow_icon     ''
+set -g @tmux_power_upload_speed_icon   '󰕒'
+set -g @tmux_power_download_speed_icon '󰇚'
+
 # Auto-install tpm if not found
 if "test ! -d ~/.tmux/plugins/tpm" \
    "run 'git clone https://github.com/tmux-plugins/tpm ~/.tmux/plugins/tpm && ~/.tmux/plugins/tpm/bin/install_plugins'"
 
 run '~/.tmux/plugins/tpm/tpm'
-

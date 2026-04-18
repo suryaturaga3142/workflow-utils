@@ -37,8 +37,10 @@ set ASM_C1_LOG = trace.core1.txt
 set SIM_TR_LOG = trace.sim.txt
 set RPT_DIR    = my-rpts
 set FPGA_DIR   = my-fpga-rpts
+# Environment details
 set MEM_HEX    = memcpu.hex
 set FPGA_HEX   = memfpga.hex
+set SRC_DIR    = source
 
 # Argument parsing
 
@@ -77,7 +79,7 @@ foreach arg ( $argv )
         set BUILD_LIST = 0
     else if ( "$arg" == "-h" ) then
         echo "Usage:"
-        echo "  supercheck -l <patterns> [design] [mode] [flag...]"
+        echo "  supercheck -l <patterns...> [design] [mode] [flag...]"
         echo ""
         echo "Designs:"
         echo "  -caches     : Simulate with caches"
@@ -91,7 +93,7 @@ foreach arg ( $argv )
         echo ""
         echo "Flags:"
         echo "  -h          : You're seeing it."
-        echo "  -fast       : Minimum cleaning in RTL/synth success"
+        echo "  -fast       : Minimum cleaning in RTL/synth"
         echo "                Use ONLY if yk what you're doing!"
         echo "  -halt       : Halt execution at first failure"
         echo "  -asmtrace   : Trace first test case fail assembly file"
@@ -119,13 +121,13 @@ if ( -e $LOCKFILE ) then
 endif
 
 # Lockfile creation
-echo -n "" >! $LOCKFILE
-echo "user  :   $USER" >> $LOCKFILE
-echo "host  :   `hostname`" >> $LOCKFILE
-echo "pid   :   $$" >> $LOCKFILE
-echo "start :   `date`" >> $LOCKFILE
-echo "pwd   :   `pwd`" >> $LOCKFILE
-echo "cmd   :   supercheck $argv" >> $LOCKFILE
+echo -n ""                          >! $LOCKFILE
+echo "user  :   $USER"              >> $LOCKFILE
+echo "host  :   `hostname`"         >> $LOCKFILE
+echo "pid   :   $$"                 >> $LOCKFILE
+echo "start :   `date`"             >> $LOCKFILE
+echo "pwd   :   `pwd`"              >> $LOCKFILE
+echo "cmd   :   supercheck $argv"   >> $LOCKFILE
 
 # Earliest point of lockfile ownership
 onintr cleanup
@@ -147,9 +149,10 @@ if ( $DO_FPGA ) then
     set MEM_HEX = $FPGA_HEX
 endif
 
-# Run timestamps
+# Run vars
 set START_TS = `date +%s`
 set RPT_TS = `date +%m-%d-%H-%M`
+set CUR_DIR = `pwd`
 
 # FPGA Device Check
 if ( $DO_FPGA ) then
@@ -189,17 +192,23 @@ echo -n "" >! $ASM_C0_LOG
 echo -n "" >! $ASM_C1_LOG
 echo -n "" >! $SIM_TR_LOG
 
+sleep 1
+
 # Start event logs
+set lat = `grep -P -o '(?<=LAT =)\s*\d+(?=;)' ${CUR_DIR}/${SRC_DIR}/ram.sv`
 set ts0 = `date +%s`
 echo "EVT_VERSION=1" >> $EVENT_LOG
-echo "TS=$START_TS EVT=RUN_START ASM=ALL STAGE=RUN STATUS=START" >> $EVENT_LOG
+echo "TS=$START_TS EVT=RUN_START ASM=ALL LAT=$lat" >> $EVENT_LOG
+if ( $DO_FPGA) then
+    echo "TS=$START_TS EVT=FPGA_INFO ASM=NONE HOSTNAME=`hostname`" >> $EVENT_LOG
+endif
 # Save calling info
-echo "user  :   $USER" >> $STATUS_LOG
-echo "host  :   `hostname`" >> $STATUS_LOG
-echo "pid   :   $$" >> $STATUS_LOG
-echo "start :   `date`" >> $STATUS_LOG
-echo "pwd   :   `pwd`" >> $STATUS_LOG
-echo "cmd   :   supercheck $argv" >> $STATUS_LOG
+echo "user  :   $USER"              >> $STATUS_LOG
+echo "host  :   `hostname`"         >> $STATUS_LOG
+echo "pid   :   $$"                 >> $STATUS_LOG
+echo "start :   `date`"             >> $STATUS_LOG
+echo "pwd   :   `pwd`"              >> $STATUS_LOG
+echo "cmd   :   supercheck $argv"   >> $STATUS_LOG
 echo "" >> $STATUS_LOG
 
 # Loop control variables
@@ -277,13 +286,15 @@ foreach file ( $ASM_GLOB )
     @ dur = $ts1 - $ts0
     echo "TS=$ts1 EVT=STAGE_END ASM=$filename STAGE=ASM STATUS=OK DUR_S=$dur" >> $EVENT_LOG
 
-    # Synthesis (done once if cleaned)
-    if ( $DO_SYNTH && $synth_done == 0 && $CLEAN ) then
+    # Synthesis (done once if requested)
+    if ( $DO_SYNTH && $synth_done == 0 ) then
         set ts0 = `date +%s`
         echo "TS=$ts0 EVT=STAGE_START ASM=$filename STAGE=SYNTH STATUS=START" >> $EVENT_LOG
         echo "> Synthesizing design for $filename ..." >> $STATUS_LOG
 
-        timeout $SYN_TIME make system.syntp >&! $RPT_DIR/rpt_${filename}_${RPT_TS}.txt
+        set rpt_file = $RPT_DIR/rpt_${RPT_TS}_${filename}.txt
+
+        timeout $SYN_TIME make system.syntp >&! $rpt_file
         set exit_code = $status
         if ( $exit_code != 0 ) then
             if ( $exit_code == 124 ) then
@@ -295,9 +306,9 @@ foreach file ( $ASM_GLOB )
             set ts1 = `date +%s`
             @ dur = $ts1 - $ts0
             if ( $exit_code == 124 ) then
-                echo "TS=$ts1 EVT=STAGE_END ASM=$filename STAGE=SYNTH STATUS=TIMEOUT CODE=$exit_code DUR_S=$dur RPT=$RPT_DIR/rpt_${filename}_${RPT_TS}.txt" >> $EVENT_LOG
+                echo "TS=$ts1 EVT=STAGE_END ASM=$filename STAGE=SYNTH STATUS=TIMEOUT CODE=$exit_code DUR_S=$dur RPT=$rpt_file" >> $EVENT_LOG
             else
-                echo "TS=$ts1 EVT=STAGE_END ASM=$filename STAGE=SYNTH STATUS=FAIL CODE=$exit_code DUR_S=$dur RPT=$RPT_DIR/rpt_${filename}_${RPT_TS}.txt" >> $EVENT_LOG
+                echo "TS=$ts1 EVT=STAGE_END ASM=$filename STAGE=SYNTH STATUS=FAIL CODE=$exit_code DUR_S=$dur RPT=$rpt_file" >> $EVENT_LOG
             endif
             @ fail_count++
             @ synth_done = 0
@@ -308,9 +319,17 @@ foreach file ( $ASM_GLOB )
         sleep 2
         @ synth_done = 1
 
+        # Synthesis frequency analysis
+        cat $rpt_file | grep -P "Fmax:\s+\d+\.\d+" >> $STATUS_LOG
+        set main_clk = `grep -P -o '(?<=Fmax:)\s*\d+\.\d+' $rpt_file | head -n 1`
+        set cpu_clk  = `grep -P -o '(?<=Fmax:)\s*\d+\.\d+' $rpt_file | tail -n 1`
+        set fmax = `echo "if ( $main_clk / 2 < $cpu_clk ) $main_clk / 2 else $cpu_clk" | bc -l`
+        set fmax = `printf "%.2f" ${fmax}`
+
         set ts1 = `date +%s`
         @ dur = $ts1 - $ts0
-        echo "TS=$ts1 EVT=STAGE_END ASM=$filename STAGE=SYNTH STATUS=OK DUR_S=$dur RPT=$RPT_DIR/rpt_${filename}_${RPT_TS}.txt" >> $EVENT_LOG
+        echo "TS=$ts1 EVT=STAGE_END ASM=$filename STAGE=SYNTH STATUS=OK DUR_S=$dur RPT=$rpt_file" >> $EVENT_LOG
+        echo "TS=$ts1 EVT=SYNTH_RESULT ASM=$filename MAIN=$main_clk CPU=$cpu_clk FMAX=$fmax" >> $EVENT_LOG
     endif
 
     # FPGA Testing
@@ -319,7 +338,9 @@ foreach file ( $ASM_GLOB )
         echo "TS=$ts0 EVT=STAGE_START ASM=$filename STAGE=FPGA STATUS=START" >> $EVENT_LOG
         echo "> Testing FPGA Implementation for $filename ..." >> $STATUS_LOG
 
-        timeout $FPGA_TIME synthesize_xilinx -m -d -p -t -f 200 system_fpga >&! $RPT_DIR/rpt_fpga_${filename}.txt
+        set rpt_file = $RPT_DIR/rpt_fpga_${RPT_TS}_${filename}.txt
+
+        timeout $FPGA_TIME synthesize_xilinx -m -d -p -t -f 200 system_fpga >&! $rpt_file
         set exit_code = $status
         if ( $exit_code != 0 ) then
             if ( $exit_code == 124 ) then
@@ -331,20 +352,23 @@ foreach file ( $ASM_GLOB )
             set ts1 = `date +%s`
             @ dur = $ts1 - $ts0
             if ( $exit_code == 124 ) then
-                echo "TS=$ts1 EVT=STAGE_END ASM=$filename STAGE=FPGA STATUS=TIMEOUT CODE=$exit_code DUR_S=$dur RPT=$RPT_DIR/rpt_fpga_${filename}.txt" >> $EVENT_LOG
+                echo "TS=$ts1 EVT=STAGE_END ASM=$filename STAGE=FPGA STATUS=TIMEOUT CODE=$exit_code DUR_S=$dur RPT=$rpt_file" >> $EVENT_LOG
             else
-                echo "TS=$ts1 EVT=STAGE_END ASM=$filename STAGE=FPGA STATUS=FAIL CODE=$exit_code DUR_S=$dur RPT=$RPT_DIR/rpt_fpga_${filename}.txt" >> $EVENT_LOG
+                echo "TS=$ts1 EVT=STAGE_END ASM=$filename STAGE=FPGA STATUS=FAIL CODE=$exit_code DUR_S=$dur RPT=$rpt_file" >> $EVENT_LOG
             endif
             @ fail_count++
             @ exit_code = 0
             if ( $HALT == 0 ) make clean >& /dev/null
             continue
-        else
-            set ts1 = `date +%s`
-            @ dur = $ts1 - $ts0
-            echo "TS=$ts1 EVT=STAGE_END ASM=$filename STAGE=FPGA STATUS=OK DUR_S=$dur RPT=$RPT_DIR/rpt_fpga_${filename}.txt" >> $EVENT_LOG
         endif
         sleep 5
+
+        # FPGA frequency analysis
+        cat $rpt_file | grep -P "Fmax:\s+\d+\.\d+" | head -n 2 >> $STATUS_LOG
+        
+        set ts1 = `date +%s`
+        @ dur = $ts1 - $ts0
+        echo "TS=$ts1 EVT=STAGE_END ASM=$filename STAGE=FPGA STATUS=OK DUR_S=$dur RPT=$rpt_file" >> $EVENT_LOG
 
     else
         # RTL / Gate Level Simulation
@@ -391,14 +415,13 @@ foreach file ( $ASM_GLOB )
     # Diff
     set ts0 = `date +%s`
     echo "TS=$ts0 EVT=STAGE_START ASM=$filename STAGE=DIFF STATUS=START" >> $EVENT_LOG
-    echo "> Noting differences..." >> $STATUS_LOG
 
     diff memsim.hex $MEM_HEX >! /tmp/diff_${filename}_${USER}.tmp
     set diff_status = $status
 
     if ( $diff_status != 0 ) then
         @ fail_count++
-
+        echo "> Noting differences..." >> $STATUS_LOG
         set diff_lines = `wc -l < /tmp/diff_${filename}_${USER}.tmp`
 
         echo "==========================================" >> $DIFF_LOG
@@ -411,6 +434,8 @@ foreach file ( $ASM_GLOB )
         @ dur = $ts1 - $ts0
         echo "TS=$ts1 EVT=STAGE_END ASM=$filename STAGE=DIFF STATUS=FAIL DUR_S=$dur DIFF_LINES=$diff_lines" >> $EVENT_LOG
     else
+        echo "> No differences..." >> $STATUS_LOG
+
         echo "==========================================" >> $DIFF_LOG
         echo "NO MISMATCH: $filename" >> $DIFF_LOG
         echo "==========================================" >> $DIFF_LOG
@@ -426,7 +451,7 @@ end
 
 # Cleanup
 
-# Needed if clean mode, FPGA, not halt, or success run
+# Needed if clean / FPGA AND not halt / success run
 if ( $CLEAN || $DO_FPGA ) then
     if ( $HALT == 0 || $fail_count == 0 ) make clean >& /dev/null
 endif
