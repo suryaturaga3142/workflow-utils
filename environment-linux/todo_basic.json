@@ -1,0 +1,108 @@
+{
+    "todo-tree.regex.regex": "((//|#|%|/\\*|\\s*-\\s*\\[\\s*\\])\\s*($TAGS))",
+    
+    "todo-tree.general.tags": [
+        "BUG",
+        "CRITICAL",
+        "FIXME",
+        "OPTIMIZE", 
+        "TODO",
+        "HACK",
+        "NOTE",
+        "REVIEW",
+        "XXX"
+    ],
+
+    "todo-tree.general.tagGroups": {
+        "FIXME": ["FIXME", "FIX", "FIXIT"],
+        "NOTE": ["NOTE", "INFO"],
+        "OPTIMIZE": ["OPTIMIZE", "PERF", "SPEED"] 
+    },
+
+    "todo-tree.highlights.defaultHighlight": {
+        "type": "text", 
+        "gutterIcon": true, 
+        "opacity": 50,
+        "borderRadius": "3px"
+    },
+
+    "todo-tree.highlights.customHighlight": {
+        "BUG": {
+            "icon": "bug",
+            "background": "#d32f2f",
+            "foreground": "#ffffff",
+            "iconColour": "#d32f2f",
+            "rulerColour": "#d32f2f",
+            "rulerLane": "full"
+        },
+        "CRITICAL": {
+            "icon": "alert",
+            "background": "#fc4040",
+            "foreground": "#ffffff",
+            "iconColour": "#fc4040",
+            "rulerColour": "#fc4040",
+            "rulerLane": "full"
+        },
+
+        "FIXME": {
+            "icon": "flame",
+            "background": "#f57c00",
+            "foreground": "#000000",
+            "iconColour": "#f57c00",
+            "rulerColour": "#f57c00",
+            "rulerLane": "right"
+        },
+
+        "OPTIMIZE": {
+            "icon": "zap",
+            "background": "#ffeb3b",
+            "foreground": "#000000",
+            "iconColour": "#ffeb3b",
+            "rulerColour": "#ffeb3b",
+            "rulerLane": "right"
+        },
+
+        "TODO": {
+            "icon": "check",
+            "background": "#1976d2",
+            "foreground": "#ffffff",
+            "iconColour": "#1976d2",
+            "rulerColour": "#1976d2",
+            "rulerLane": "right"
+        },
+
+        "HACK": {
+            "icon": "tools",
+            "background": "#7b1fa2",
+            "foreground": "#ffffff",
+            "iconColour": "#7b1fa2"
+        },
+        "XXX": {
+            "icon": "beaker",
+            "background": "#924efc",
+            "foreground": "#ffffff",
+            "iconColour": "#924efc"
+        },
+
+        "NOTE": {
+            "icon": "note",
+            "background": "#388e3c",
+            "foreground": "#ffffff",
+            "iconColour": "#388e3c"
+        },
+        "REVIEW": {
+            "icon": "eye",
+            "background": "#0097a7",
+            "foreground": "#ffffff",
+            "iconColour": "#0097a7"
+        }
+    },
+
+    "todo-tree.filtering.excludeGlobs": [
+        "**/node_modules/**",
+        "**/dist/**",
+        "**/build/**",
+        "**/work/**",
+        "**/__pycache__/**"
+    ]
+}
