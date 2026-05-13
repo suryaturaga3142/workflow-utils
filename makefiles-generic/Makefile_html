@@ -1,0 +1,4 @@
+all: ssh_guide_v1.md style.css
+	pandoc ssh_guide_v1.md -s -o ssh_guide_v1.html --css=style.css --highlight-style=espresso
+
+.PHONY: all
