@@ -47,6 +47,7 @@ alias grep='grep --color=auto'
 # alias mv='mv -i'
 
 # --- Developer Tools & Vim Mode ---
+#alias tmux='tmux -u'
 alias g++='g++ -Wall -Wextra -std=c++17'
 alias gcc='gcc -Wall -Wextra'
 alias py='python3'

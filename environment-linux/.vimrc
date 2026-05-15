@@ -79,7 +79,7 @@ nnoremap <silent> <C-k> :TmuxNavigateUp<cr>
 nnoremap <silent> <C-l> :TmuxNavigateRight<cr>
 
 " Resizing Splits (Ctrl + Arrow Keys)
-" We use 3 'greater/less than' signs to resize faster per press
+" Use 3 'greater/less than' signs to resize faster per press
 nnoremap <silent> <C-Left> :vertical resize -3<CR>
 nnoremap <silent> <C-Right> :vertical resize +3<CR>
 nnoremap <silent> <C-Up> :resize +3<CR>
@@ -128,3 +128,4 @@ nnoremap <leader>= <C-W>=
 nnoremap <leader>ff :Files<CR>
 nnoremap <leader>fb :Buffers<CR>
 nnoremap <leader>fg :Rg<CR>
+
