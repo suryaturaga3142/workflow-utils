@@ -1,0 +1,83 @@
+# ==========================================
+# Zephyr / nRF Connect Project Makefile
+# ==========================================
+
+# --- Variables ---
+# Override these from the command line if needed, e.g., `make monitor PORT=/dev/ttyACM0`
+DEVICE ?= nrf54l15dk/nrf54l15/cpuapp
+PORT   ?= /dev/ttyACM1
+BAUD   ?= 115200
+BUILD_DIR ?= build
+
+# Default target when you just type 'make'
+.PHONY: all
+all: build
+
+# --- Core Build Commands ---
+
+.PHONY: setup
+setup:
+	@echo "==> Generating CMake cache and setting up board: $(DEVICE)"
+	west build -b $(DEVICE)
+
+.PHONY: build
+build:
+	@echo "==> Compiling project (Incremental)"
+	west build
+
+.PHONY: flash
+flash:
+	@echo "==> Flashing firmware to board via J-Link"
+	west flash
+
+.PHONY: run
+run: build flash
+	@echo "==> Build & Flash complete!"
+
+# --- Debugging & Monitoring ---
+
+.PHONY: debug
+debug:
+	@echo "==> Launching GDB session..."
+	west debug
+
+.PHONY: monitor
+monitor:
+	@echo "==> Connecting to $(PORT) at $(BAUD) baud. Press Ctrl+A then Ctrl+X to exit."
+	picocom $(PORT) -b $(BAUD)
+
+# --- Memory & Configuration Reports ---
+# Note: For graphical reports, keep the nRF VS Code extension open. 
+# These targets provide fast, CLI-based hierarchical tree views.
+
+.PHONY: ram
+ram:
+	@echo "==> Generating RAM Usage Report..."
+	west build -t ram_report
+
+.PHONY: rom
+rom:
+	@echo "==> Generating ROM (Flash) Usage Report..."
+	west build -t rom_report
+
+.PHONY: menuconfig
+menuconfig:
+	@echo "==> Opening Zephyr Kconfig Terminal UI..."
+	west build -t menuconfig
+
+.PHONY: guiconfig
+guiconfig:
+	@echo "==> Opening Zephyr Kconfig Graphical UI..."
+	west build -t guiconfig
+
+# --- Cleanup ---
+
+.PHONY: clean
+clean:
+	@echo "==> Cleaning build artifacts (keeps CMake cache)..."
+	west build -t clean
+
+.PHONY: veryclean
+veryclean:
+	@echo "==> Nuking build directory..."
+	rm -rf $(BUILD_DIR)
