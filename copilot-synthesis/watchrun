@@ -3,6 +3,9 @@
 # Surya Turaga
 # suryapratheek.turaga@gmail.com
 # GitHub: suryaturaga3142
+#
+# I don't see why you'd ever call this manually thanks to runtest,
+# so I didn't really bother with making it user friendly.
 
 # Configuration
 EVENT_LOG="run.events.txt"
